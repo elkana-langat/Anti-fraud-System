@@ -514,9 +514,30 @@ files:
 - name: src/antifraud/model/TransactionStatus.java
   visible: true
   learner_created: true
+- name: src/antifraud/controller/AuthController.java
+  visible: true
+  learner_created: true
+- name: src/antifraud/dto/AppUserDTO.java
+  visible: true
+  learner_created: true
+- name: src/antifraud/model/UserRequest.java
+  visible: true
+  learner_created: true
+- name: src/antifraud/repository/AppUserRepository.java
+  visible: true
+  learner_created: true
+- name: src/antifraud/service/AppUserDetailsServiceImpl.java
+  visible: true
+  learner_created: true
+- name: src/antifraud/entity/AppUser.java
+  visible: true
+  learner_created: true
+- name: src/antifraud/model/DeleteResponse.java
+  visible: true
+  learner_created: true
 feedback_link: https://hyperskill.org/learn/step/18068#comment
-status: Failed
+status: Solved
 feedback:
-  message: Execution failed
-  time: "Wed, 09 Aug 2023 14:37:38 UTC"
+  message: Congratulations!
+  time: "Fri, 11 Aug 2023 13:25:11 UTC"
 record: 2
