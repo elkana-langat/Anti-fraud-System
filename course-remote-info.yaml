@@ -3,7 +3,7 @@ hyperskill_project:
   ide_files: https://cogniterra.org/media/attachments/lesson/26277/additional_files.json
   is_template_based: false
   use_ide: true
-update_date: "Wed, 09 Aug 2023 14:34:54 UTC"
+update_date: "Fri, 11 Aug 2023 08:57:00 UTC"
 stages:
 - id: 1161
   step: 18067
@@ -369,7 +369,7 @@ topics:
   - title: HTTP Basic Auth
     theory_id: 7778
   - title: Custom User Store
-    theory_id: 16191
+    theory_id: 32430
   - title: Relational Data Model
     theory_id: 13785
   - title: What is SQL

@@ -56,86 +56,6 @@ files:
         implementation 'org.springframework.boot:spring-boot-starter-web'
     }
   learner_created: false
-- name: src/antifraud/dto/Amount.java
-  visible: true
-  text: |
-    package antifraud.dto;
-
-    public record Amount(Long amount) {}
-  learner_created: false
-- name: src/antifraud/controller/TransactionController.java
-  visible: true
-  text: |
-    package antifraud.controller;
-
-    import antifraud.dto.Amount;
-    import antifraud.dto.Result;
-    import antifraud.dto.TransactionOption;
-    import org.springframework.http.ResponseEntity;
-    import org.springframework.web.bind.annotation.*;
-
-    @RestController
-    @RequestMapping("/api/antifraud/transaction")
-    public class TransactionController {
-
-        @PostMapping
-        public ResponseEntity<Result> makeTransaction(@RequestBody Amount amount) {
-            Long totalWithdrawal = amount.amount();
-            TransactionOption transactionOption;
-
-            if (totalWithdrawal == null) {
-                return ResponseEntity.badRequest().build();
-            } else if (totalWithdrawal <= 200 && totalWithdrawal > 0) {
-                transactionOption = TransactionOption.ALLOWED;
-            } else if (totalWithdrawal > 200 && totalWithdrawal <= 1500) {
-                transactionOption = TransactionOption.MANUAL_PROCESSING;
-            } else if (totalWithdrawal > 1500) {
-                transactionOption = TransactionOption.PROHIBITED;
-            } else {
-                return ResponseEntity.badRequest().build();
-            }
-
-            Result result = new Result(transactionOption);
-            return ResponseEntity.ok(result);
-        }
-    }
-  learner_created: false
-- name: src/antifraud/dto/Result.java
-  visible: true
-  text: |
-    package antifraud.dto;
-
-    public class Result {
-
-        private TransactionOption result;
-
-        public Result() {
-        }
-
-        public Result(TransactionOption result) {
-            this.result = result;
-        }
-
-        public TransactionOption getResult() {
-            return result;
-        }
-
-        public void setResult(TransactionOption result) {
-            this.result = result;
-        }
-    }
-  learner_created: false
-- name: src/antifraud/dto/TransactionOption.java
-  visible: true
-  text: |
-    package antifraud.dto;
-
-    public enum TransactionOption {
-        ALLOWED,
-        MANUAL_PROCESSING,
-        PROHIBITED
-    }
-  learner_created: false
 - name: test/AntiFraudTest.java
   visible: false
   text: |-
@@ -579,6 +499,21 @@ files:
         };
     }
   learner_created: false
+- name: src/antifraud/config/SecurityConfig.java
+  visible: true
+  learner_created: true
+- name: src/antifraud/controller/AntiFraudTransactionController.java
+  visible: true
+  learner_created: true
+- name: src/antifraud/model/TransactionRequest.java
+  visible: true
+  learner_created: true
+- name: src/antifraud/model/ValidationResponse.java
+  visible: true
+  learner_created: true
+- name: src/antifraud/model/TransactionStatus.java
+  visible: true
+  learner_created: true
 feedback_link: https://hyperskill.org/learn/step/18068#comment
 status: Failed
 feedback:
