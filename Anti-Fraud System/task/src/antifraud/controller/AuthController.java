@@ -1,8 +1,7 @@
 package antifraud.controller;
 
 import antifraud.dto.AppUserDTO;
-import antifraud.model.DeleteResponse;
-import antifraud.model.UserRequest;
+import antifraud.model.*;
 import antifraud.service.AppUserDetailsServiceImpl;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -11,6 +10,7 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -49,6 +49,37 @@ public class AuthController {
             return new ResponseEntity<>(appUserDetailsService.deleteUser(username), HttpStatus.OK);
         } else {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+    }
+
+    @PutMapping("/role")
+    public ResponseEntity<AppUserDTO> changeUserRole(@Valid @RequestBody UserRoleRequest userRoleRequest, BindingResult bindingResult) {
+        if (bindingResult.hasErrors()) {
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        } else {
+            if (appUserDetailsService.userExists(userRoleRequest.getUsername())) {
+                if (!Objects.equals(userRoleRequest.getRole(), "MERCHANT") && !Objects.equals(userRoleRequest.getRole(), "SUPPORT")) {
+                    return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+                } else {
+                    return appUserDetailsService.changeUserRole(userRoleRequest); // Return the response from changeUserRole
+                }
+            } else {
+                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+            }
+        }
+    }
+
+
+    @PutMapping("/access")
+    public ResponseEntity<AccessResponse> changeUserAccess(@Valid @RequestBody UserAccessRequest userAccessRequest, BindingResult bindingResult) {
+        if (bindingResult.hasErrors()) {
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        } else {
+            if (appUserDetailsService.userExists(userAccessRequest.getUsername())) {
+                return appUserDetailsService.changeUserAccessStatus(userAccessRequest);
+            } else {
+                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+            }
         }
     }
 }

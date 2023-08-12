@@ -23,12 +23,17 @@ public class SecurityConfig {
                 .headers(headers -> headers.frameOptions().disable()) // for
                 // Postman, the H2 console
                 .authorizeHttpRequests(auth -> auth // manage access
+                        .requestMatchers(HttpMethod.DELETE,
+                                "/api/auth/user/**").hasRole("ADMINISTRATOR")
+                        .requestMatchers(HttpMethod.GET, "/api/auth/list").hasAnyRole("ADMINISTRATOR", "SUPPORT")
                         .requestMatchers(HttpMethod.POST, "/api/antifraud" +
-                                "/transaction").permitAll()
+                                "/transaction").hasRole("MERCHANT")
+                        .requestMatchers(HttpMethod.PUT, "/api/auth/access").hasRole("ADMINISTRATOR")
+                        .requestMatchers(HttpMethod.PUT, "/api/auth/role").hasRole("ADMINISTRATOR")
                         .requestMatchers("/actuator/shutdown").permitAll() //
                         // needs to run test
                         .requestMatchers(HttpMethod.POST, "/api/auth/user").permitAll()
-                        .anyRequest().authenticated()
+                        .anyRequest().denyAll()
                 )
                 .sessionManagement(session -> session
                                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)

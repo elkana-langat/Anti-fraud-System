@@ -40,7 +40,7 @@ public class UserRequest {
         return password;
     }
 
-    public void setPassword() {
+    public void setPassword(String password) {
         this.password = password;
     }
 }

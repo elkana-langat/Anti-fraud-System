@@ -1,18 +1,22 @@
 package antifraud.dto;
 
+import antifraud.model.UserRoles;
+
 public class AppUserDTO {
 
     private Long id;
     private String name;
     private String username;
+    private UserRoles role;
 
     public AppUserDTO() {
     }
 
-    public AppUserDTO(Long id, String name, String username) {
+    public AppUserDTO(Long id, String name, String username, UserRoles role) {
         this.id = id;
         this.name = name;
         this.username = username;
+        this.role = role;
     }
 
     public Long getId() {
@@ -37,6 +41,14 @@ public class AppUserDTO {
 
     public void setUsername(String username) {
         this.username = username;
+    }
+
+    public UserRoles getRole() {
+        return role;
+    }
+
+    public void setRole(UserRoles role) {
+        this.role = role;
     }
 }
 

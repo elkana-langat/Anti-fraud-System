@@ -57,86 +57,6 @@ files:
         implementation 'org.springframework.boot:spring-boot-starter-web'
     }
   learner_created: false
-- name: src/antifraud/dto/Amount.java
-  visible: true
-  text: |
-    package antifraud.dto;
-
-    public record Amount(Long amount) {}
-  learner_created: false
-- name: src/antifraud/controller/TransactionController.java
-  visible: true
-  text: |
-    package antifraud.controller;
-
-    import antifraud.dto.Amount;
-    import antifraud.dto.Result;
-    import antifraud.dto.TransactionOption;
-    import org.springframework.http.ResponseEntity;
-    import org.springframework.web.bind.annotation.*;
-
-    @RestController
-    @RequestMapping("/api/antifraud/transaction")
-    public class TransactionController {
-
-        @PostMapping
-        public ResponseEntity<Result> makeTransaction(@RequestBody Amount amount) {
-            Long totalWithdrawal = amount.amount();
-            TransactionOption transactionOption;
-
-            if (totalWithdrawal == null) {
-                return ResponseEntity.badRequest().build();
-            } else if (totalWithdrawal <= 200 && totalWithdrawal > 0) {
-                transactionOption = TransactionOption.ALLOWED;
-            } else if (totalWithdrawal > 200 && totalWithdrawal <= 1500) {
-                transactionOption = TransactionOption.MANUAL_PROCESSING;
-            } else if (totalWithdrawal > 1500) {
-                transactionOption = TransactionOption.PROHIBITED;
-            } else {
-                return ResponseEntity.badRequest().build();
-            }
-
-            Result result = new Result(transactionOption);
-            return ResponseEntity.ok(result);
-        }
-    }
-  learner_created: false
-- name: src/antifraud/dto/Result.java
-  visible: true
-  text: |
-    package antifraud.dto;
-
-    public class Result {
-
-        private TransactionOption result;
-
-        public Result() {
-        }
-
-        public Result(TransactionOption result) {
-            this.result = result;
-        }
-
-        public TransactionOption getResult() {
-            return result;
-        }
-
-        public void setResult(TransactionOption result) {
-            this.result = result;
-        }
-    }
-  learner_created: false
-- name: src/antifraud/dto/TransactionOption.java
-  visible: true
-  text: |
-    package antifraud.dto;
-
-    public enum TransactionOption {
-        ALLOWED,
-        MANUAL_PROCESSING,
-        PROHIBITED
-    }
-  learner_created: false
 - name: test/AntiFraudTest.java
   visible: false
   text: |-
@@ -1174,6 +1094,816 @@ files:
         };
     }
   learner_created: false
+- name: src/antifraud/service/AppUserDetailsServiceImpl.java
+  visible: true
+  text: |-
+    package antifraud.service;
+
+    import antifraud.dto.AppUserDTO;
+    import antifraud.entity.AppUser;
+    import antifraud.model.*;
+    import antifraud.repository.AppUserRepository;
+    import jakarta.transaction.Transactional;
+    import org.springframework.http.HttpStatus;
+    import org.springframework.http.ResponseEntity;
+    import org.springframework.security.core.userdetails.UserDetails;
+    import org.springframework.security.core.userdetails.UserDetailsService;
+    import org.springframework.security.core.userdetails.UsernameNotFoundException;
+    import org.springframework.security.crypto.password.PasswordEncoder;
+    import org.springframework.stereotype.Service;
+
+    import java.util.ArrayList;
+    import java.util.List;
+    import java.util.Objects;
+    import java.util.Optional;
+
+    @Service
+    public class AppUserDetailsServiceImpl implements UserDetailsService {
+
+        private final AppUserRepository repository;
+        private final PasswordEncoder passwordEncoder;
+
+        public AppUserDetailsServiceImpl(AppUserRepository repository, PasswordEncoder passwordEncoder) {
+            this.repository = repository;
+            this.passwordEncoder = passwordEncoder;
+        }
+
+        @Override
+        public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+            return repository
+                    .findAppUserByUsernameIgnoreCase(username)
+                    .orElseThrow(() -> new UsernameNotFoundException("Not found"));
+        }
+
+        // check if a user exists with username
+        public boolean userExists(String username) {
+            return repository
+                    .existsByUsernameIgnoreCase(username);
+        }
+
+        // get all users in the database
+        public List<AppUserDTO> getAllUser() {
+            List<AppUserDTO> appUserDTOS = new ArrayList<>();
+            List<AppUser> appUsers = repository.findAll();
+
+            for (AppUser user : appUsers) {
+                appUserDTOS.add(convertAppUser(user));
+            }
+
+
+            return appUserDTOS;
+        }
+
+        // convert UserRequest to AppUser
+        @Transactional
+        public AppUserDTO registerUser(UserRequest request) {
+            long countAll = repository.count();
+            AppUser user = new AppUser();
+
+            user.setName(request.getName());
+            user.setUsername(request.getUsername());
+            user.setPassword(passwordEncoder.encode(request.getPassword()));
+
+            if (countAll == 0) {
+                user.setRole(UserRoles.ADMINISTRATOR);
+                user.setAccountLocked(true);
+            } else {
+                user.setRole(UserRoles.MERCHANT);
+                user.setAccountLocked(false);
+            }
+
+            return convertAppUser(repository.save(user));
+        }
+
+        // delete user by username
+        @Transactional
+        public DeleteResponse deleteUser(String username) {
+            Optional<AppUser> user = repository.findAppUserByUsernameIgnoreCase(username);
+            String usernameToDelete = user.get().getUsername();
+
+            DeleteResponse response = new DeleteResponse();
+            response.setUsername(usernameToDelete);
+            response.setStatus("Deleted successfully!");
+
+            repository.deleteByUsername(usernameToDelete);
+
+            return response;
+        }
+
+        // convert AppUser to AppUserDto
+        public AppUserDTO convertAppUser(AppUser user) {
+            AppUserDTO appUserDTO = new AppUserDTO();
+
+            appUserDTO.setId(user.getId());
+            appUserDTO.setName(user.getName());
+            appUserDTO.setUsername(user.getUsername());
+            appUserDTO.setRole(user.getRole());
+
+            return appUserDTO;
+        }
+
+        // change a user role
+        public ResponseEntity<AppUserDTO> changeUserRole(UserRoleRequest userRoleRequest) {
+            Optional<AppUser> user =
+                    repository.findAppUserByUsernameIgnoreCase(userRoleRequest.getUsername());
+
+            String userRoleFromDB = String.valueOf(user.get().getRole());
+            String newUserRoleRequest = userRoleRequest.getRole();
+
+            if (Objects.equals(userRoleFromDB, "ADMINISTRATOR")) {
+                return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+            } else {
+                if (Objects.equals(userRoleFromDB, newUserRoleRequest)) {
+                    return new ResponseEntity<>(HttpStatus.CONFLICT);
+                } else {
+                    if (Objects.equals(newUserRoleRequest, "SUPPORT")) {
+                        user.get().setRole(UserRoles.SUPPORT);
+                    } else if (Objects.equals(newUserRoleRequest, "MERCHANT")) {
+                        user.get().setRole(UserRoles.MERCHANT);
+                    }
+                }
+
+                return new ResponseEntity<>(convertAppUser(repository.save(user.get())
+                ), HttpStatus.OK);
+            }
+        }
+
+        // change a user access roles
+        public ResponseEntity<AccessResponse> changeUserAccessStatus(UserAccessRequest userAccessRequest) {
+            Optional<AppUser> user =
+                    repository.findAppUserByUsernameIgnoreCase(userAccessRequest.getUsername());
+
+            String userRole = String.valueOf(user.get().getRole());
+
+            if (Objects.equals(userRole, "ADMINISTRATOR")) {
+                return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+            } else {
+                String operation = userAccessRequest.getOperation();
+                AccessResponse accessResponse = new AccessResponse();
+
+                if (Objects.equals(operation, "LOCK")) {
+                    user.get().setAccountLocked(false);
+                    repository.save(user.get());
+                    String status = String.format("User %s locked!",
+                            userAccessRequest.getUsername());
+                    accessResponse.setStatus(status);
+                    return new ResponseEntity<>(accessResponse, HttpStatus.OK);
+                } else if (Objects.equals(operation, "UNLOCK")) {
+                    user.get().setAccountLocked(true);
+                    repository.save(user.get());
+                    String status = String.format("User %s unlocked!",
+                            userAccessRequest.getUsername());
+                    accessResponse.setStatus(status);
+                    return new ResponseEntity<>(accessResponse, HttpStatus.OK);
+                }
+            }
+            return null;
+        }
+
+    }
+  learner_created: true
+- name: src/antifraud/model/UserAccessRequest.java
+  visible: true
+  text: |
+    package antifraud.model;
+
+    import jakarta.validation.constraints.NotBlank;
+
+    public class UserAccessRequest {
+
+        @NotBlank
+        private String username;
+        private String operation;
+
+        public UserAccessRequest() {
+        }
+
+        public UserAccessRequest(String username, String operation) {
+            this.username = username;
+            this.operation = operation;
+        }
+
+        public String getUsername() {
+            return username;
+        }
+
+        public void setUsername(String username) {
+            this.username = username;
+        }
+
+        public String getOperation() {
+            return operation;
+        }
+
+        public void setOperation(String operation) {
+            this.operation = operation;
+        }
+    }
+  learner_created: true
+- name: src/antifraud/model/UserRequest.java
+  visible: true
+  text: |
+    package antifraud.model;
+
+    import jakarta.validation.constraints.NotBlank;
+
+    public class UserRequest {
+
+        @NotBlank
+        private String name;
+        @NotBlank
+        private String username;
+        @NotBlank
+        private String password;
+
+        public UserRequest() {
+        }
+
+        public UserRequest(String name, String username, String password) {
+            this.name = name;
+            this.username = username;
+            this.password = password;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getUsername() {
+            return username;
+        }
+
+        public void setUsername(String username) {
+            this.username = username;
+        }
+
+        public String getPassword() {
+            return password;
+        }
+
+        public void setPassword(String password) {
+            this.password = password;
+        }
+    }
+  learner_created: true
+- name: src/antifraud/model/TransactionRequest.java
+  visible: true
+  text: |-
+    package antifraud.model;
+
+    import jakarta.validation.constraints.NotNull;
+
+    public class TransactionRequest {
+
+        @NotNull
+        private Long amount;
+
+        public TransactionRequest() {
+        }
+
+        public TransactionRequest(Long amount) {
+            this.amount = amount;
+        }
+
+        public Long getAmount() {
+            return amount;
+        }
+
+        public void setAmount(Long amount) {
+            this.amount = amount;
+        }
+    }
+  learner_created: true
+- name: src/antifraud/dto/AppUserDTO.java
+  visible: true
+  text: |+
+    package antifraud.dto;
+
+    import antifraud.model.UserRoles;
+
+    public class AppUserDTO {
+
+        private Long id;
+        private String name;
+        private String username;
+        private UserRoles role;
+
+        public AppUserDTO() {
+        }
+
+        public AppUserDTO(Long id, String name, String username, UserRoles role) {
+            this.id = id;
+            this.name = name;
+            this.username = username;
+            this.role = role;
+        }
+
+        public Long getId() {
+            return id;
+        }
+
+        public void setId(Long id) {
+            this.id = id;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getUsername() {
+            return username;
+        }
+
+        public void setUsername(String username) {
+            this.username = username;
+        }
+
+        public UserRoles getRole() {
+            return role;
+        }
+
+        public void setRole(UserRoles role) {
+            this.role = role;
+        }
+    }
+
+
+  learner_created: true
+- name: src/antifraud/model/AccessResponse.java
+  visible: true
+  text: |
+    package antifraud.model;
+
+    public class AccessResponse {
+
+        private String status;
+
+        public AccessResponse() {
+        }
+
+        public AccessResponse(String status) {
+            this.status = status;
+        }
+
+        public String getStatus() {
+            return status;
+        }
+
+        public void setStatus(String status) {
+            this.status = status;
+        }
+    }
+  learner_created: true
+- name: src/antifraud/model/TransactionStatus.java
+  visible: true
+  text: |
+    package antifraud.model;
+
+    public enum TransactionStatus {
+        ALLOWED,
+        MANUAL_PROCESSING,
+        PROHIBITED
+    }
+  learner_created: true
+- name: src/antifraud/entity/AppUser.java
+  visible: true
+  text: |
+    package antifraud.entity;
+
+    import antifraud.model.UserRoles;
+    import jakarta.persistence.Column;
+    import jakarta.persistence.Entity;
+    import jakarta.persistence.GeneratedValue;
+    import jakarta.persistence.Id;
+    import org.springframework.security.core.GrantedAuthority;
+    import org.springframework.security.core.authority.SimpleGrantedAuthority;
+    import org.springframework.security.core.userdetails.UserDetails;
+
+    import java.util.Collection;
+    import java.util.Set;
+
+    @Entity
+    public class AppUser implements UserDetails {
+
+        @Id
+        @GeneratedValue
+        private Long id;
+        private String name;
+        @Column(unique = true)
+        private String username;
+        private String password;
+        private UserRoles role;
+        private boolean isAccountLocked;
+
+        public boolean isAccountLocked() {
+            return isAccountLocked;
+        }
+
+        public void setAccountLocked(boolean accountLocked) {
+            isAccountLocked = accountLocked;
+        }
+
+        public Long getId() {
+            return id;
+        }
+
+        public void setId(Long id) {
+            this.id = id;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public Collection<? extends GrantedAuthority> getAuthorities() {
+            String roles = String.format("ROLE_%s", role);
+            return Set.of(new SimpleGrantedAuthority(roles));
+        }
+
+        @Override
+        public String getUsername() {
+            return username;
+        }
+
+        public void setUsername(String username) {
+            this.username = username;
+        }
+
+        @Override
+        public String getPassword() {
+            return password;
+        }
+
+        public void setPassword(String password) {
+            this.password = password;
+        }
+
+        public UserRoles getRole() {
+            return role;
+        }
+
+        public void setRole(UserRoles role) {
+            this.role = role;
+        }
+
+        @Override
+        public boolean isAccountNonExpired() {
+            return true;
+        }
+
+        @Override
+        public boolean isAccountNonLocked() {
+            return isAccountLocked;
+        }
+
+        @Override
+        public boolean isCredentialsNonExpired() {
+            return true;
+        }
+
+        @Override
+        public boolean isEnabled() {
+            return true;
+        }
+    }
+  learner_created: true
+- name: src/antifraud/controller/AuthController.java
+  visible: true
+  text: |
+    package antifraud.controller;
+
+    import antifraud.dto.AppUserDTO;
+    import antifraud.model.*;
+    import antifraud.service.AppUserDetailsServiceImpl;
+    import jakarta.validation.Valid;
+    import org.springframework.http.HttpStatus;
+    import org.springframework.http.ResponseEntity;
+    import org.springframework.validation.BindingResult;
+    import org.springframework.web.bind.annotation.*;
+
+    import java.util.List;
+    import java.util.Objects;
+
+    @RestController
+    @RequestMapping("/api/auth")
+    public class AuthController {
+
+        private final AppUserDetailsServiceImpl appUserDetailsService;
+
+        public AuthController(AppUserDetailsServiceImpl appUserDetailsService) {
+            this.appUserDetailsService = appUserDetailsService;
+        }
+
+        @PostMapping("/user")
+        public ResponseEntity<AppUserDTO> registerUser(
+                @Valid @RequestBody UserRequest userRequest,
+                BindingResult bindingResult) {
+            if (bindingResult.hasErrors()) {
+                return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+            } else {
+                if (appUserDetailsService.userExists(userRequest.getUsername())) {
+                    return new ResponseEntity<>(HttpStatus.CONFLICT);
+                } else {
+                    return new ResponseEntity<>(appUserDetailsService.registerUser(userRequest),
+                            HttpStatus.CREATED);
+                }
+            }
+        }
+
+        @GetMapping("/list")
+        public List<AppUserDTO> getAllUsers() {
+            return appUserDetailsService.getAllUser();
+        }
+
+        @DeleteMapping("/user/{username}")
+        public ResponseEntity<DeleteResponse> deleteUser(@PathVariable String username) {
+            if (appUserDetailsService.userExists(username)) {
+                return new ResponseEntity<>(appUserDetailsService.deleteUser(username), HttpStatus.OK);
+            } else {
+                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+            }
+        }
+
+        @PutMapping("/role")
+        public ResponseEntity<AppUserDTO> changeUserRole(@Valid @RequestBody UserRoleRequest userRoleRequest, BindingResult bindingResult) {
+            if (bindingResult.hasErrors()) {
+                return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+            } else {
+                if (appUserDetailsService.userExists(userRoleRequest.getUsername())) {
+                    if (!Objects.equals(userRoleRequest.getRole(), "MERCHANT") && !Objects.equals(userRoleRequest.getRole(), "SUPPORT")) {
+                        return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+                    } else {
+                        return appUserDetailsService.changeUserRole(userRoleRequest); // Return the response from changeUserRole
+                    }
+                } else {
+                    return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+                }
+            }
+        }
+
+
+        @PutMapping("/access")
+        public ResponseEntity<AccessResponse> changeUserAccess(@Valid @RequestBody UserAccessRequest userAccessRequest, BindingResult bindingResult) {
+            if (bindingResult.hasErrors()) {
+                return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+            } else {
+                if (appUserDetailsService.userExists(userAccessRequest.getUsername())) {
+                    return appUserDetailsService.changeUserAccessStatus(userAccessRequest);
+                } else {
+                    return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+                }
+            }
+        }
+    }
+  learner_created: true
+- name: src/antifraud/model/ValidationResponse.java
+  visible: true
+  text: |-
+    package antifraud.model;
+
+    public class ValidationResponse {
+
+        private TransactionStatus result;
+
+        public ValidationResponse() {
+        }
+
+        public ValidationResponse(TransactionStatus result) {
+            this.result = result;
+        }
+
+        public TransactionStatus getResult() {
+            return result;
+        }
+
+        public void setResult(TransactionStatus result) {
+            this.result = result;
+        }
+    }
+  learner_created: true
+- name: src/antifraud/model/UserRoles.java
+  visible: true
+  text: |
+    package antifraud.model;
+
+    public enum UserRoles {
+        ADMINISTRATOR,
+        MERCHANT,
+        SUPPORT
+    }
+  learner_created: true
+- name: src/antifraud/controller/AntiFraudTransactionController.java
+  visible: true
+  text: |-
+    package antifraud.controller;
+
+    import antifraud.model.TransactionRequest;
+    import antifraud.model.TransactionStatus;
+    import antifraud.model.ValidationResponse;
+    import jakarta.validation.Valid;
+    import org.springframework.http.HttpStatus;
+    import org.springframework.http.ResponseEntity;
+    import org.springframework.validation.BindingResult;
+    import org.springframework.web.bind.annotation.PostMapping;
+    import org.springframework.web.bind.annotation.RequestBody;
+    import org.springframework.web.bind.annotation.RequestMapping;
+    import org.springframework.web.bind.annotation.RestController;
+
+    @RestController
+    @RequestMapping("/api/antifraud")
+    public class AntiFraudTransactionController {
+
+        @PostMapping("/transaction")
+        public ResponseEntity<ValidationResponse> processTransaction(@Valid @RequestBody TransactionRequest request, BindingResult bindingResult) {
+            Long amount = request.getAmount();
+
+            ValidationResponse response = new ValidationResponse();
+
+            if (bindingResult.hasErrors()) {
+                return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+            }
+
+            if (amount <= 0) {
+                return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+            }
+
+            if (amount <= 200) {
+                response.setResult(TransactionStatus.ALLOWED);
+            } else if (amount <= 1500) {
+                response.setResult(TransactionStatus.MANUAL_PROCESSING);
+            } else {
+                response.setResult(TransactionStatus.PROHIBITED);
+            }
+
+            return new ResponseEntity<>(response, HttpStatus.OK);
+        }
+
+    }
+  learner_created: true
+- name: src/antifraud/model/UserRoleRequest.java
+  visible: true
+  text: |
+    package antifraud.model;
+
+    import jakarta.validation.constraints.NotBlank;
+
+    public class UserRoleRequest {
+
+        @NotBlank
+        private String username;
+        @NotBlank
+        private String role;
+
+        public UserRoleRequest() {
+        }
+
+        public UserRoleRequest(String username, String role) {
+            this.username = username;
+            this.role = role;
+        }
+
+        public String getUsername() {
+            return username;
+        }
+
+        public void setUsername(String username) {
+            this.username = username;
+        }
+
+        public String getRole() {
+            return role;
+        }
+
+        public void setRole(String role) {
+            this.role = role;
+        }
+    }
+  learner_created: true
+- name: src/antifraud/config/SecurityConfig.java
+  visible: true
+  text: |
+    package antifraud.config;
+
+    import org.springframework.context.annotation.Bean;
+    import org.springframework.context.annotation.Configuration;
+    import org.springframework.http.HttpMethod;
+    import org.springframework.security.config.Customizer;
+    import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+    import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+    import org.springframework.security.config.http.SessionCreationPolicy;
+    import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+    import org.springframework.security.crypto.password.PasswordEncoder;
+    import org.springframework.security.web.SecurityFilterChain;
+
+    @Configuration
+    public class SecurityConfig {
+
+        @Bean
+        public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+            http
+                    .httpBasic(Customizer.withDefaults())
+                    .csrf(AbstractHttpConfigurer::disable) // For modifying
+                    // requests via postman
+                    .headers(headers -> headers.frameOptions().disable()) // for
+                    // Postman, the H2 console
+                    .authorizeHttpRequests(auth -> auth // manage access
+                            .requestMatchers(HttpMethod.DELETE,
+                                    "/api/auth/user/**").hasRole("ADMINISTRATOR")
+                            .requestMatchers(HttpMethod.GET, "/api/auth/list").hasAnyRole("ADMINISTRATOR", "SUPPORT")
+                            .requestMatchers(HttpMethod.POST, "/api/antifraud" +
+                                    "/transaction").hasRole("MERCHANT")
+                            .requestMatchers(HttpMethod.PUT, "/api/auth/access").hasRole("ADMINISTRATOR")
+                            .requestMatchers(HttpMethod.PUT, "/api/auth/role").hasRole("ADMINISTRATOR")
+                            .requestMatchers("/actuator/shutdown").permitAll() //
+                            // needs to run test
+                            .requestMatchers(HttpMethod.POST, "/api/auth/user").permitAll()
+                            .anyRequest().denyAll()
+                    )
+                    .sessionManagement(session -> session
+                                    .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                            // no session
+                    );
+
+            return http.build();
+        }
+
+        @Bean
+        public PasswordEncoder passwordEncoder() {
+            return new BCryptPasswordEncoder();
+        }
+    }
+  learner_created: true
+- name: src/antifraud/model/DeleteResponse.java
+  visible: true
+  text: |
+    package antifraud.model;
+
+    public class DeleteResponse {
+
+        private String username;
+        private String status;
+
+        public DeleteResponse() {
+        }
+
+        public DeleteResponse(String username, String status) {
+            this.username = username;
+            this.status = status;
+        }
+
+        public String getUsername() {
+            return username;
+        }
+
+        public void setUsername(String username) {
+            this.username = username;
+        }
+
+        public String getStatus() {
+            return status;
+        }
+
+        public void setStatus(String status) {
+            this.status = status;
+        }
+    }
+  learner_created: true
+- name: src/antifraud/repository/AppUserRepository.java
+  visible: true
+  text: |
+    package antifraud.repository;
+
+    import antifraud.entity.AppUser;
+    import jakarta.transaction.Transactional;
+    import org.springframework.data.jpa.repository.JpaRepository;
+
+    import java.util.Optional;
+
+    public interface AppUserRepository extends JpaRepository<AppUser, Long> {
+
+        Optional<AppUser> findAppUserByUsernameIgnoreCase(String username);
+
+        boolean existsByUsernameIgnoreCase(String username);
+
+        @Transactional
+        void deleteByUsername(String usernameToDelete);
+
+        long count();
+    }
+  learner_created: true
 feedback_link: https://hyperskill.org/learn/step/18070#comment
 status: Unchecked
 record: -1

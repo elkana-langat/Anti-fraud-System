@@ -14,4 +14,6 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
 
     @Transactional
     void deleteByUsername(String usernameToDelete);
+
+    long count();
 }
