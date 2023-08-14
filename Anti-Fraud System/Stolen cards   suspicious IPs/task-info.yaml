@@ -1904,6 +1904,36 @@ files:
         long count();
     }
   learner_created: true
+- name: src/antifraud/entity/SuspiciousIP.java
+  visible: true
+  learner_created: true
+- name: src/antifraud/model/IP.java
+  visible: true
+  learner_created: true
+- name: src/antifraud/repository/SuspiciousIPRepository.java
+  visible: true
+  learner_created: true
+- name: src/antifraud/service/SuspiciousIPService.java
+  visible: true
+  learner_created: true
+- name: src/antifraud/model/SuspiciousIPResponse.java
+  visible: true
+  learner_created: true
+- name: src/antifraud/model/Stolencard.java
+  visible: true
+  learner_created: true
+- name: src/antifraud/entity/Stolencards.java
+  visible: true
+  learner_created: true
+- name: src/antifraud/repository/StolencardsRepository.java
+  visible: true
+  learner_created: true
+- name: src/antifraud/service/StolencardsService.java
+  visible: true
+  learner_created: true
 feedback_link: https://hyperskill.org/learn/step/18070#comment
-status: Unchecked
+status: Solved
+feedback:
+  message: Congratulations!
+  time: "Mon, 14 Aug 2023 06:32:11 UTC"
 record: -1
